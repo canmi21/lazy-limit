@@ -17,6 +17,18 @@ crate-type = ["lib"]
 name = "demo"
 path = "examples/demo.rs"
 
+[[example]]
+name = "interval"
+path = "examples/interval.rs"
+
+[[example]]
+name = "gc"
+path = "examples/gc.rs"
+
+[[example]]
+name = "mix"
+path = "examples/mix.rs"
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 once_cell = "1"
