@@ -1,0 +1,20 @@
+[package]
+name = "lazy-limit"
+version = "1.0.0"
+edition = "2024"
+description = "lazy-limit is a lightweight Rust library for rate limiting by IP or custom ID, with support for global, router-specific, and fallback rules."
+license = "MIT"
+repository = "https://github.com/canmi21/lazy-limit"
+readme = "README.md"
+keywords = ["network", "server", "lazy", "limit", "web", "router", "ratelimit"]
+categories = ["network-programming", "web-programming", "development-tools"]
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["lib"]
+
+[[example]]
+name = "demo"
+path = "examples/demo.rs"
+
+[dependencies]
