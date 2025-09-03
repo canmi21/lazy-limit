@@ -6,7 +6,7 @@ description = "lazy-limit is a lightweight Rust library for rate limiting by IP 
 license = "MIT"
 repository = "https://github.com/canmi21/lazy-limit"
 readme = "README.md"
-keywords = ["network", "server", "lazy", "limit", "web", "router", "ratelimit"]
+keywords = ["network", "server", "limit", "web", "router"]
 categories = ["network-programming", "web-programming", "development-tools"]
 
 [lib]
