@@ -10,7 +10,6 @@ pub struct LimiterConfig {
     pub route_rules: HashMap<String, RuleConfig>,
     pub max_memory: usize,
     pub gc_interval: u64,
-    pub prefix_matching: bool,
 }
 
 impl LimiterConfig {
@@ -20,7 +19,6 @@ impl LimiterConfig {
             route_rules: HashMap::new(),
             max_memory: 64 * 1024 * 1024, // 64MB default
             gc_interval: 10,              // 10 seconds default
-            prefix_matching: false,       // Disabled by default
         }
     }
 
@@ -36,11 +34,6 @@ impl LimiterConfig {
 
     pub fn with_gc_interval(mut self, gc_interval: u64) -> Self {
         self.gc_interval = gc_interval;
-        self
-    }
-
-    pub fn with_prefix_matching(mut self, enable: bool) -> Self {
-        self.prefix_matching = enable;
         self
     }
 
@@ -62,44 +55,39 @@ impl LimiterConfig {
             return rule;
         }
 
-        // Then try to find parent route if prefix matching is enabled
-        if self.prefix_matching {
-            if let Some(rule) = self.find_parent_route_rule(route) {
-                return rule;
-            }
+        // Then try to find parent route if it's configured as prefix
+        if let Some(rule) = self.find_parent_route_rule(route) {
+            return rule;
         }
 
         &self.default_rule
     }
 
     pub fn has_route_rule(&self, route: &str) -> bool {
-        // Check for exact match
-        if self.route_rules.contains_key(route) {
-            return true;
-        }
-        // Check for parent route if prefix matching is enabled
-        if self.prefix_matching {
-            return self.find_parent_route_rule(route).is_some();
-        }
-        false
+        // Check for exact match or parent route match
+        self.route_rules.contains_key(route) || self.find_parent_route_rule(route).is_some()
     }
 
     fn find_parent_route_rule(&self, route: &str) -> Option<&RuleConfig> {
         // Find the longest parent route (prefix match)
-        // e.g. for "/api/contact/123" find "/api/contact/"
-        let mut longest_prefix: Option<&String> = None;
+        // Only matches routes that are configured with is_prefix=true
+        // e.g. for "/api/contact/123" find "/api/contact/" if it has is_prefix=true
+        let mut longest_prefix: Option<(&String, &RuleConfig)> = None;
         let mut longest_len = 0;
 
-        for configured_route in self.route_rules.keys() {
-            // Parent route must end with "/" and be a prefix
-            if configured_route.ends_with('/') && route.starts_with(configured_route) {
+        for (configured_route, rule) in self.route_rules.iter() {
+            // Only consider routes configured as prefix routes
+            if rule.is_prefix
+                && configured_route.ends_with('/')
+                && route.starts_with(configured_route)
+            {
                 if configured_route.len() > longest_len {
-                    longest_prefix = Some(configured_route);
+                    longest_prefix = Some((configured_route, rule));
                     longest_len = configured_route.len();
                 }
             }
         }
 
-        longest_prefix.and_then(|prefix| self.route_rules.get(prefix))
+        longest_prefix.map(|(_, rule)| rule)
     }
 }

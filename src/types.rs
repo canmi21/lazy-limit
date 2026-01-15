@@ -42,11 +42,21 @@ impl Duration {
 pub struct RuleConfig {
     pub interval: Duration,
     pub limit: u32,
+    pub is_prefix: bool,
 }
 
 impl RuleConfig {
     pub fn new(interval: Duration, limit: u32) -> Self {
-        Self { interval, limit }
+        Self {
+            interval,
+            limit,
+            is_prefix: false,
+        }
+    }
+
+    pub fn match_prefix(mut self, is_prefix: bool) -> Self {
+        self.is_prefix = is_prefix;
+        self
     }
 }
 

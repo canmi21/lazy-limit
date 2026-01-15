@@ -48,6 +48,7 @@ async fn main() {
             ("/api/login", RuleConfig::new(Duration::minutes(1), 3)), // 3 req/min
             ("/api/public", RuleConfig::new(Duration::seconds(1), 10)), // 10 req/s
             ("/api/premium", RuleConfig::new(Duration::seconds(1), 20)), // 20 req/s
+            ("/api/prefix/", RuleConfig::new(Duration::seconds(1), 3).match_prefix(true)), // 3 req/s, match prefix only
         ]
     ).await;
 

@@ -200,9 +200,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_rate_limiting_prefix_matching() {
-        let config = LimiterConfig::new(RuleConfig::new(Duration::minutes(1), 1))
-            .add_route_rule("/prefix/", RuleConfig::new(Duration::seconds(1), 2))
-            .with_prefix_matching(true);
+        let config = LimiterConfig::new(RuleConfig::new(Duration::minutes(1), 1)).add_route_rule(
+            "/prefix/",
+            RuleConfig::new(Duration::seconds(1), 2).match_prefix(true),
+        );
         let mut limiter = RateLimiter::new(config).await;
 
         let who = "test_user_basic";

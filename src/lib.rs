@@ -34,9 +34,8 @@ static GLOBAL_LIMITER: OnceCell<Arc<RwLock<RateLimiter>>> = OnceCell::const_new(
 ///         max_memory: Some(64 * 1024 * 1024), // 64MB
 ///         routes: [
 ///             ("/api/login", RuleConfig::new(Duration::minutes(1), 3)),
-///             ("/api/public", RuleConfig::new(Duration::seconds(1), 10)),
-///         ],
-///         prefix_matching: true
+///             ("/api/", RuleConfig::new(Duration::seconds(1), 10).match_prefix(true)),
+///         ]
 ///     ).await;
 /// }
 /// ```
@@ -46,7 +45,6 @@ macro_rules! init_rate_limiter {
         default: $default_rule:expr
         $(, max_memory: $max_memory:expr)?
         $(, routes: [ $(($route:expr, $rule:expr)),* $(,)? ])?
-        $(, prefix_matching: $prefix_matching:expr)?
     ) => {
         {
             let mut config = $crate::LimiterConfig::new($default_rule);
@@ -61,10 +59,6 @@ macro_rules! init_rate_limiter {
                 $(
                     config = config.add_route_rule($route, $rule);
                 )*
-            )?
-
-            $(
-                config = config.with_prefix_matching($prefix_matching);
             )?
 
             $crate::initialize_limiter(config)
