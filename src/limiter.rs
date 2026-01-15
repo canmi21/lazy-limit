@@ -199,6 +199,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_rate_limiting_prefix_matching() {
+        let config = LimiterConfig::new(RuleConfig::new(Duration::minutes(1), 1))
+            .add_route_rule("/prefix/", RuleConfig::new(Duration::seconds(1), 2))
+            .with_prefix_matching(true);
+        let mut limiter = RateLimiter::new(config).await;
+
+        let who = "test_user_basic";
+        let route = "/prefix/{test}";
+
+        assert!(
+            limiter.check_limit(who, route, true).await,
+            "Req 1 to /prefix/* should pass"
+        );
+        assert!(
+            limiter.check_limit(who, route, true).await,
+            "Req 2 to /prefix/* should pass"
+        );
+        assert!(
+            !limiter.check_limit(who, route, true).await,
+            "Req 3 to /prefix/* should fail"
+        );
+
+        tokio::time::sleep(StdDuration::from_millis(1100)).await;
+        assert!(
+            limiter.check_limit(who, route, true).await,
+            "Req 4 to /prefix/* after wait should pass"
+        );
+    }
+
+    #[tokio::test]
     async fn test_override_mode() {
         let config = LimiterConfig::new(RuleConfig::new(Duration::seconds(1), 1))
             .add_route_rule("/premium", RuleConfig::new(Duration::seconds(1), 5));
