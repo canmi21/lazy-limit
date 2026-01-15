@@ -50,10 +50,54 @@ impl LimiterConfig {
     }
 
     pub fn get_rule_for_route(&self, route: &str) -> &RuleConfig {
-        self.route_rules.get(route).unwrap_or(&self.default_rule)
+        // First try exact match
+        if let Some(rule) = self.route_rules.get(route) {
+            return rule;
+        }
+
+        // Then try to find parent route if it's configured as prefix
+        if let Some(rule) = self.find_parent_route_rule(route) {
+            return rule;
+        }
+
+        &self.default_rule
     }
 
     pub fn has_route_rule(&self, route: &str) -> bool {
+        // Check for exact match or parent route match
+        self.route_rules.contains_key(route) || self.find_parent_route_rule(route).is_some()
+    }
+
+    /// Check if there's an exact route match (not a prefix match)
+    pub fn is_exact_route(&self, route: &str) -> bool {
         self.route_rules.contains_key(route)
+    }
+
+    /// Check if there's a prefix route match (not an exact match)
+    pub fn is_prefix_route(&self, route: &str) -> bool {
+        !self.is_exact_route(route) && self.find_parent_route_rule(route).is_some()
+    }
+
+    fn find_parent_route_rule(&self, route: &str) -> Option<&RuleConfig> {
+        // Find the longest parent route (prefix match)
+        // Only matches routes that are configured with is_prefix=true
+        // e.g. for "/api/contact/123" find "/api/contact/" if it has is_prefix=true
+        let mut longest_prefix: Option<(&String, &RuleConfig)> = None;
+        let mut longest_len = 0;
+
+        for (configured_route, rule) in self.route_rules.iter() {
+            // Only consider routes configured as prefix routes
+            if rule.is_prefix
+                && configured_route.ends_with('/')
+                && route.starts_with(configured_route)
+            {
+                if configured_route.len() > longest_len {
+                    longest_prefix = Some((configured_route, rule));
+                    longest_len = configured_route.len();
+                }
+            }
+        }
+
+        longest_prefix.map(|(_, rule)| rule)
     }
 }

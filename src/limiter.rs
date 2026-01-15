@@ -34,12 +34,22 @@ impl RateLimiter {
             };
             (None, rule)
         } else {
-            let rule = if self.config.has_route_rule(route) {
-                self.config.get_rule_for_route(route)
+            // Check if this is a prefix route (not exact match)
+            let is_prefix_route = self.config.is_prefix_route(route);
+
+            if is_prefix_route {
+                // For prefix routes, only apply the prefix rule, not global limit
+                let rule = self.config.get_rule_for_route(route);
+                (None, Some(rule))
             } else {
-                &self.config.default_rule
-            };
-            (Some(&self.config.default_rule), Some(rule))
+                // For exact routes or default, apply global rule as before
+                let rule = if self.config.has_route_rule(route) {
+                    self.config.get_rule_for_route(route)
+                } else {
+                    &self.config.default_rule
+                };
+                (Some(&self.config.default_rule), Some(rule))
+            }
         };
 
         if override_mode && route_rule_opt.is_none() {
@@ -195,6 +205,37 @@ mod tests {
         assert!(
             !limiter.check_limit(who, "/regular", false).await,
             "Req 3 to /regular after wait should fail"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_rate_limiting_prefix_matching() {
+        let config = LimiterConfig::new(RuleConfig::new(Duration::minutes(1), 1)).add_route_rule(
+            "/prefix/",
+            RuleConfig::new(Duration::seconds(1), 2).match_prefix(true),
+        );
+        let mut limiter = RateLimiter::new(config).await;
+
+        let who = "test_user_basic";
+        let route = "/prefix/{test}";
+
+        assert!(
+            limiter.check_limit(who, route, true).await,
+            "Req 1 to /prefix/* should pass"
+        );
+        assert!(
+            limiter.check_limit(who, route, true).await,
+            "Req 2 to /prefix/* should pass"
+        );
+        assert!(
+            !limiter.check_limit(who, route, true).await,
+            "Req 3 to /prefix/* should fail"
+        );
+
+        tokio::time::sleep(StdDuration::from_millis(1100)).await;
+        assert!(
+            limiter.check_limit(who, route, true).await,
+            "Req 4 to /prefix/* after wait should pass"
         );
     }
 
