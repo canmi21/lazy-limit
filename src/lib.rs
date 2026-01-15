@@ -34,7 +34,8 @@ static GLOBAL_LIMITER: OnceCell<Arc<RwLock<RateLimiter>>> = OnceCell::const_new(
 ///         max_memory: Some(64 * 1024 * 1024), // 64MB
 ///         routes: [
 ///             ("/api/login", RuleConfig::new(Duration::minutes(1), 3)),
-///             ("/api/", RuleConfig::new(Duration::seconds(1), 10).match_prefix(true)),
+///             ("/api/public", RuleConfig::new(Duration::seconds(1), 10)),
+///             ("/api/prefix/", RuleConfig::new(Duration::seconds(1), 2).match_prefix(true)),
 ///         ]
 ///     ).await;
 /// }
