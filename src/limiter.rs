@@ -3,7 +3,7 @@
 use crate::config::LimiterConfig;
 use crate::gc::GarbageCollector;
 use crate::types::{RequestRecord, RuleConfig};
-use axum::http::Method;
+use http::Method;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;

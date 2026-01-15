@@ -1,6 +1,6 @@
 /* src/lib.rs */
 
-use axum::http::Method;
+use http::Method;
 use std::sync::Arc;
 use tokio::sync::{OnceCell, RwLock};
 

@@ -1,6 +1,6 @@
 /* examples/demo.rs */
 
-use axum::http::Method;
+use http::Method;
 use lazy_limit::*;
 use std::time::Duration as StdDuration;
 use tokio::time::sleep;

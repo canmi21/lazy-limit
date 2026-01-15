@@ -1,7 +1,7 @@
 /* src/config.rs */
 
 use crate::types::{Duration, RuleConfig};
-use axum::http::Method;
+use http::Method;
 use std::collections::HashMap;
 
 /// Configuration for the rate limiter
