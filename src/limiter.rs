@@ -34,12 +34,22 @@ impl RateLimiter {
             };
             (None, rule)
         } else {
-            let rule = if self.config.has_route_rule(route) {
-                self.config.get_rule_for_route(route)
+            // Check if this is a prefix route (not exact match)
+            let is_prefix_route = self.config.is_prefix_route(route);
+
+            if is_prefix_route {
+                // For prefix routes, only apply the prefix rule, not global limit
+                let rule = self.config.get_rule_for_route(route);
+                (None, Some(rule))
             } else {
-                &self.config.default_rule
-            };
-            (Some(&self.config.default_rule), Some(rule))
+                // For exact routes or default, apply global rule as before
+                let rule = if self.config.has_route_rule(route) {
+                    self.config.get_rule_for_route(route)
+                } else {
+                    &self.config.default_rule
+                };
+                (Some(&self.config.default_rule), Some(rule))
+            }
         };
 
         if override_mode && route_rule_opt.is_none() {

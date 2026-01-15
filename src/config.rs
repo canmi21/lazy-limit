@@ -68,6 +68,16 @@ impl LimiterConfig {
         self.route_rules.contains_key(route) || self.find_parent_route_rule(route).is_some()
     }
 
+    /// Check if there's an exact route match (not a prefix match)
+    pub fn is_exact_route(&self, route: &str) -> bool {
+        self.route_rules.contains_key(route)
+    }
+
+    /// Check if there's a prefix route match (not an exact match)
+    pub fn is_prefix_route(&self, route: &str) -> bool {
+        !self.is_exact_route(route) && self.find_parent_route_rule(route).is_some()
+    }
+
     fn find_parent_route_rule(&self, route: &str) -> Option<&RuleConfig> {
         // Find the longest parent route (prefix match)
         // Only matches routes that are configured with is_prefix=true

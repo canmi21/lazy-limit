@@ -129,7 +129,10 @@ mod tests {
     async fn test_basic_rate_limiting() {
         // We re-create the limiter for each test, which isn't ideal with a global static.
         // For a simple test suite, this works by overwriting.
-        let config = LimiterConfig::new(RuleConfig::new(Duration::seconds(1), 2));
+        let config = LimiterConfig::new(RuleConfig::new(Duration::seconds(1), 1)).add_route_rule(
+            "/prefix/",
+            RuleConfig::new(Duration::seconds(1), 2).match_prefix(true),
+        );
         let limiter = RateLimiter::new(config).await;
         let _ = GLOBAL_LIMITER.set(Arc::new(RwLock::new(limiter)));
 
@@ -137,8 +140,17 @@ mod tests {
         let route = "/test";
 
         assert!(check_limit(who, route).await);
+        assert!(!check_limit(who, route).await);
+
+        tokio::time::sleep(StdDuration::from_secs(1)).await;
         assert!(check_limit(who, route).await);
 
+        // Test prefix match
+        let who = "test_ip";
+        let route = "/prefix/{test}";
+
+        assert!(check_limit(who, route).await);
+        assert!(check_limit(who, route).await);
         assert!(!check_limit(who, route).await);
 
         tokio::time::sleep(StdDuration::from_secs(1)).await;
