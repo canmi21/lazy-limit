@@ -1,6 +1,7 @@
 /* src/config.rs */
 
 use crate::types::{Duration, RuleConfig};
+use axum::http::Method;
 use std::collections::HashMap;
 
 /// Configuration for the rate limiter
@@ -49,47 +50,59 @@ impl LimiterConfig {
         max
     }
 
-    pub fn get_rule_for_route(&self, route: &str) -> &RuleConfig {
-        // First try exact match
+    pub fn get_rule_for_route(&self, route: &str, method: &Option<Method>) -> &RuleConfig {
+        // First try exact match with method consideration
         if let Some(rule) = self.route_rules.get(route) {
-            return rule;
+            if rule.matches_method(method) {
+                return rule;
+            }
         }
 
         // Then try to find parent route if it's configured as prefix
-        if let Some(rule) = self.find_parent_route_rule(route) {
+        if let Some(rule) = self.find_parent_route_rule(route, method) {
             return rule;
         }
 
         &self.default_rule
     }
 
-    pub fn has_route_rule(&self, route: &str) -> bool {
-        // Check for exact match or parent route match
-        self.route_rules.contains_key(route) || self.find_parent_route_rule(route).is_some()
+    pub fn has_route_rule(&self, route: &str, method: &Option<Method>) -> bool {
+        // Check for exact match or parent route match with method consideration
+        if let Some(rule) = self.route_rules.get(route) {
+            if rule.matches_method(method) {
+                return true;
+            }
+        }
+        self.find_parent_route_rule(route, method).is_some()
     }
 
     /// Check if there's an exact route match (not a prefix match)
-    pub fn is_exact_route(&self, route: &str) -> bool {
-        self.route_rules.contains_key(route)
+    pub fn is_exact_route(&self, route: &str, method: &Option<Method>) -> bool {
+        if let Some(rule) = self.route_rules.get(route) {
+            rule.matches_method(method)
+        } else {
+            false
+        }
     }
 
     /// Check if there's a prefix route match (not an exact match)
-    pub fn is_prefix_route(&self, route: &str) -> bool {
-        !self.is_exact_route(route) && self.find_parent_route_rule(route).is_some()
+    pub fn is_prefix_route(&self, route: &str, method: &Option<Method>) -> bool {
+        !self.is_exact_route(route, method) && self.find_parent_route_rule(route, method).is_some()
     }
 
-    fn find_parent_route_rule(&self, route: &str) -> Option<&RuleConfig> {
+    fn find_parent_route_rule(&self, route: &str, method: &Option<Method>) -> Option<&RuleConfig> {
         // Find the longest parent route (prefix match)
-        // Only matches routes that are configured with is_prefix=true
+        // Only matches routes that are configured with is_prefix=true and match the method
         // e.g. for "/api/contact/123" find "/api/contact/" if it has is_prefix=true
         let mut longest_prefix: Option<(&String, &RuleConfig)> = None;
         let mut longest_len = 0;
 
         for (configured_route, rule) in self.route_rules.iter() {
-            // Only consider routes configured as prefix routes
+            // Only consider routes configured as prefix routes that match the method
             if rule.is_prefix
                 && configured_route.ends_with('/')
                 && route.starts_with(configured_route)
+                && rule.matches_method(method)
             {
                 if configured_route.len() > longest_len {
                     longest_prefix = Some((configured_route, rule));

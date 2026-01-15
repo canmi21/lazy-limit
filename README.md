@@ -7,6 +7,8 @@
 - **Global Rate Limiting**: Apply a default rate limit across all requests.
 - **Route-Specific Rules**: Define custom rate limits for specific routes or endpoints.
 - **Override Mode**: Bypass global limits to enforce only route-specific rules when needed.
+- **Match Prefix**: Apply rate limit to a route prefix.
+- **Methods Matching**: Apply rate limit to specific HTTP methods, like [POST, DELETE] for example.
 - **Memory Management**: Built-in garbage collection to manage memory usage for request records.
 - **Asynchronous Design**: Built on Tokio for non-blocking, high-performance rate limiting.
 - **Customizable Configuration**: Set maximum memory usage, garbage collection intervals, and more.
@@ -49,6 +51,7 @@ async fn main() {
             ("/api/public", RuleConfig::new(Duration::seconds(1), 10)), // 10 req/s
             ("/api/premium", RuleConfig::new(Duration::seconds(1), 20)), // 20 req/s
             ("/api/prefix/", RuleConfig::new(Duration::seconds(1), 3).match_prefix(true)), // 3 req/s, match prefix only
+            ("/api/method/", RuleConfig::new(Duration::seconds(1), 2).for_methods(vec![HttpMethod::POST])), // 2 req/s, for POST only
         ]
     ).await;
 

@@ -2,6 +2,8 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use axum::http::Method;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Duration {
     Seconds(u64),
@@ -43,6 +45,7 @@ pub struct RuleConfig {
     pub interval: Duration,
     pub limit: u32,
     pub is_prefix: bool,
+    pub methods: Option<Vec<Method>>,
 }
 
 impl RuleConfig {
@@ -51,12 +54,30 @@ impl RuleConfig {
             interval,
             limit,
             is_prefix: false,
+            methods: None,
         }
     }
 
     pub fn match_prefix(mut self, is_prefix: bool) -> Self {
         self.is_prefix = is_prefix;
         self
+    }
+
+    pub fn for_methods(mut self, methods: Vec<Method>) -> Self {
+        self.methods = Some(methods);
+        self
+    }
+
+    /// Check if this rule applies to the given HTTP method
+    pub fn matches_method(&self, method: &Option<Method>) -> bool {
+        match (&self.methods, method) {
+            // If no methods specified, rule applies to all methods
+            (None, _) => true,
+            // If methods specified but no method provided, no match
+            (Some(_), None) => false,
+            // If both specified, check if method is in the list
+            (Some(allowed), Some(m)) => allowed.contains(m),
+        }
     }
 }
 
