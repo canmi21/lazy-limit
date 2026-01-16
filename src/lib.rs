@@ -75,7 +75,10 @@ macro_rules! init_rate_limiter {
 #[macro_export]
 macro_rules! limit {
     ($who:expr, $route:expr) => {
-        $crate::check_limit($who, $route)
+        $crate::check_limit($who, $route, None)
+    };
+    ($who:expr, $route:expr, $method:expr) => {
+        $crate::check_limit($who, $route, Some($method))
     };
 }
 
@@ -87,7 +90,10 @@ macro_rules! limit {
 #[macro_export]
 macro_rules! limit_override {
     ($who:expr, $route:expr) => {
-        $crate::check_limit_override($who, $route)
+        $crate::check_limit_override($who, $route, None)
+    };
+    ($who:expr, $route:expr, $method:expr) => {
+        $crate::check_limit_override($who, $route, Some($method))
     };
 }
 
@@ -100,20 +106,26 @@ pub async fn initialize_limiter(config: LimiterConfig) {
 }
 
 /// Check if a request should be allowed.
-pub async fn check_limit(who: &str, route: &str) -> bool {
+///
+/// Method can be provided as `Option<HttpMethod>`, `Option<&str>`, or `Option<String>`.
+/// When `None` is passed, the rule applies to all methods.
+pub async fn check_limit(who: &str, route: &str, method: Option<HttpMethod>) -> bool {
     if let Some(limiter) = GLOBAL_LIMITER.get() {
         let mut limiter = limiter.write().await;
-        limiter.check_limit(who, route, false).await
+        limiter.check_limit(who, route, method, false).await
     } else {
         panic!("Rate limiter not initialized! Call init_rate_limiter! first.");
     }
 }
 
 /// Check rate limit with override mode.
-pub async fn check_limit_override(who: &str, route: &str) -> bool {
+///
+/// Method can be provided as `Option<HttpMethod>`, `Option<&str>`, or `Option<String>`.
+/// When `None` is passed, the rule applies to all methods.
+pub async fn check_limit_override(who: &str, route: &str, method: Option<HttpMethod>) -> bool {
     if let Some(limiter) = GLOBAL_LIMITER.get() {
         let mut limiter = limiter.write().await;
-        limiter.check_limit(who, route, true).await
+        limiter.check_limit(who, route, method, true).await
     } else {
         panic!("Rate limiter not initialized! Call init_rate_limiter! first.");
     }
@@ -129,31 +141,49 @@ mod tests {
     async fn test_basic_rate_limiting() {
         // We re-create the limiter for each test, which isn't ideal with a global static.
         // For a simple test suite, this works by overwriting.
-        let config = LimiterConfig::new(RuleConfig::new(Duration::seconds(1), 1)).add_route_rule(
-            "/prefix/",
-            RuleConfig::new(Duration::seconds(1), 2).match_prefix(true),
-        );
+        let config = LimiterConfig::new(RuleConfig::new(Duration::seconds(1), 1))
+            .add_route_rule(
+                "/prefix/",
+                RuleConfig::new(Duration::seconds(1), 2).match_prefix(true),
+            )
+            .add_route_rule(
+                "/method",
+                RuleConfig::new(Duration::seconds(1), 2).for_methods(vec![HttpMethod::POST]),
+            );
         let limiter = RateLimiter::new(config).await;
         let _ = GLOBAL_LIMITER.set(Arc::new(RwLock::new(limiter)));
 
         let who = "test_ip";
         let route = "/test";
 
-        assert!(check_limit(who, route).await);
-        assert!(!check_limit(who, route).await);
+        assert!(check_limit(who, route, None).await);
+        assert!(!check_limit(who, route, None).await);
 
         tokio::time::sleep(StdDuration::from_secs(1)).await;
-        assert!(check_limit(who, route).await);
+        assert!(check_limit(who, route, None).await);
 
         // Test prefix match
         let who = "test_ip";
         let route = "/prefix/{test}";
 
-        assert!(check_limit(who, route).await);
-        assert!(check_limit(who, route).await);
-        assert!(!check_limit(who, route).await);
+        assert!(check_limit(who, route, None).await);
+        assert!(check_limit(who, route, None).await);
+        assert!(!check_limit(who, route, None).await);
 
         tokio::time::sleep(StdDuration::from_secs(1)).await;
-        assert!(check_limit(who, route).await);
+        assert!(check_limit(who, route, None).await);
+
+        // Test method match
+        let who = "test_ip";
+        let route = "/method";
+
+        assert!(check_limit(who, route, Some(HttpMethod::POST)).await);
+        assert!(check_limit(who, route, Some(HttpMethod::POST)).await);
+        assert!(!check_limit(who, route, Some(HttpMethod::POST)).await);
+
+        tokio::time::sleep(StdDuration::from_secs(1)).await;
+        assert!(check_limit(who, route, Some(HttpMethod::POST)).await);
+        assert!(check_limit(who, route, Some(HttpMethod::GET)).await);
+        assert!(!check_limit(who, route, Some(HttpMethod::GET)).await);
     }
 }
