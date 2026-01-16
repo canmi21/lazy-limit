@@ -1,6 +1,5 @@
 /* examples/demo.rs */
 
-use http::Method;
 use lazy_limit::*;
 use std::time::Duration as StdDuration;
 use tokio::time::sleep;
@@ -166,7 +165,7 @@ async fn test_method_specific() {
     // Test POST requests
     println!("  Testing POST to /api/data:");
     for i in 1..=4 {
-        let allowed = limit!(ip, "/api/data", Method::POST).await;
+        let allowed = limit!(ip, "/api/data", HttpMethod::POST).await;
         println!(
             "    POST Request #{}: {}",
             i,
@@ -177,7 +176,7 @@ async fn test_method_specific() {
 
     println!("  Testing GET to /api/data (different counter from POST):");
     for i in 1..=4 {
-        let allowed = limit!(ip, "/api/data", Method::GET).await;
+        let allowed = limit!(ip, "/api/data", HttpMethod::GET).await;
         println!(
             "    GET Request #{}: {}",
             i,
@@ -187,7 +186,7 @@ async fn test_method_specific() {
         assert!(allowed);
     }
 
-    println!("  Method-specific test passed.");
+    println!("  HttpMethod-specific test passed.");
 }
 
 #[tokio::main]
@@ -202,7 +201,7 @@ async fn main() {
             ("/api/public", RuleConfig::new(Duration::seconds(1), 5)),
             ("/api/premium", RuleConfig::new(Duration::seconds(1), 20)),
             ("/api/users/", RuleConfig::new(Duration::seconds(1), 10).match_prefix(true)),
-            ("/api/data", RuleConfig::new(Duration::seconds(1), 3).for_methods(vec![Method::POST])),
+            ("/api/data", RuleConfig::new(Duration::seconds(1), 3).for_methods(vec![HttpMethod::POST])),
         ]
     )
     .await;
@@ -240,7 +239,7 @@ async fn main() {
     test_prefix_matching().await;
     println!();
 
-    println!("--- Test 7: Method-Specific Rules ---");
+    println!("--- Test 7: HttpMethod-Specific Rules ---");
     test_method_specific().await;
     println!();
 

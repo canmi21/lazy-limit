@@ -2,7 +2,78 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use http::Method;
+/// HTTP Method enum
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HttpMethod {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+    PATCH,
+    HEAD,
+    OPTIONS,
+    CONNECT,
+    TRACE,
+    OTHER,
+}
+
+impl HttpMethod {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::GET => "GET",
+            Self::POST => "POST",
+            Self::PUT => "PUT",
+            Self::DELETE => "DELETE",
+            Self::PATCH => "PATCH",
+            Self::HEAD => "HEAD",
+            Self::OPTIONS => "OPTIONS",
+            Self::CONNECT => "CONNECT",
+            Self::TRACE => "TRACE",
+            Self::OTHER => "OTHER",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_uppercase().as_str() {
+            "GET" => Some(Self::GET),
+            "POST" => Some(Self::POST),
+            "PUT" => Some(Self::PUT),
+            "DELETE" => Some(Self::DELETE),
+            "PATCH" => Some(Self::PATCH),
+            "HEAD" => Some(Self::HEAD),
+            "OPTIONS" => Some(Self::OPTIONS),
+            "CONNECT" => Some(Self::CONNECT),
+            "TRACE" => Some(Self::TRACE),
+            _ => Some(Self::OTHER),
+        }
+    }
+}
+
+impl std::fmt::Display for HttpMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl From<&str> for HttpMethod {
+    fn from(s: &str) -> Self {
+        HttpMethod::from_str(s).unwrap_or_else(|| {
+            panic!("Invalid HTTP method: {}. Expected one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, CONNECT, TRACE", s)
+        })
+    }
+}
+
+impl From<&String> for HttpMethod {
+    fn from(s: &String) -> Self {
+        HttpMethod::from(s.as_str())
+    }
+}
+
+impl From<String> for HttpMethod {
+    fn from(s: String) -> Self {
+        HttpMethod::from(s.as_str())
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Duration {
@@ -45,7 +116,7 @@ pub struct RuleConfig {
     pub interval: Duration,
     pub limit: u32,
     pub is_prefix: bool,
-    pub methods: Option<Vec<Method>>,
+    pub methods: Option<Vec<HttpMethod>>,
 }
 
 impl RuleConfig {
@@ -63,13 +134,13 @@ impl RuleConfig {
         self
     }
 
-    pub fn for_methods(mut self, methods: Vec<Method>) -> Self {
+    pub fn for_methods(mut self, methods: Vec<HttpMethod>) -> Self {
         self.methods = Some(methods);
         self
     }
 
     /// Check if this rule applies to the given HTTP method
-    pub fn matches_method(&self, method: &Option<Method>) -> bool {
+    pub fn matches_method(&self, method: &Option<HttpMethod>) -> bool {
         match (&self.methods, method) {
             // If no methods specified, rule applies to all methods
             (None, _) => true,

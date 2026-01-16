@@ -1,7 +1,6 @@
 /* src/config.rs */
 
-use crate::types::{Duration, RuleConfig};
-use http::Method;
+use crate::types::{Duration, HttpMethod, RuleConfig};
 use std::collections::HashMap;
 
 /// Configuration for the rate limiter
@@ -50,7 +49,7 @@ impl LimiterConfig {
         max
     }
 
-    pub fn get_rule_for_route(&self, route: &str, method: &Option<Method>) -> &RuleConfig {
+    pub fn get_rule_for_route(&self, route: &str, method: &Option<HttpMethod>) -> &RuleConfig {
         // First try exact match with method consideration
         if let Some(rule) = self.route_rules.get(route) {
             if rule.matches_method(method) {
@@ -66,7 +65,7 @@ impl LimiterConfig {
         &self.default_rule
     }
 
-    pub fn has_route_rule(&self, route: &str, method: &Option<Method>) -> bool {
+    pub fn has_route_rule(&self, route: &str, method: &Option<HttpMethod>) -> bool {
         // Check for exact match or parent route match with method consideration
         if let Some(rule) = self.route_rules.get(route) {
             if rule.matches_method(method) {
@@ -77,7 +76,7 @@ impl LimiterConfig {
     }
 
     /// Check if there's an exact route match (not a prefix match)
-    pub fn is_exact_route(&self, route: &str, method: &Option<Method>) -> bool {
+    pub fn is_exact_route(&self, route: &str, method: &Option<HttpMethod>) -> bool {
         if let Some(rule) = self.route_rules.get(route) {
             rule.matches_method(method)
         } else {
@@ -86,11 +85,15 @@ impl LimiterConfig {
     }
 
     /// Check if there's a prefix route match (not an exact match)
-    pub fn is_prefix_route(&self, route: &str, method: &Option<Method>) -> bool {
+    pub fn is_prefix_route(&self, route: &str, method: &Option<HttpMethod>) -> bool {
         !self.is_exact_route(route, method) && self.find_parent_route_rule(route, method).is_some()
     }
 
-    fn find_parent_route_rule(&self, route: &str, method: &Option<Method>) -> Option<&RuleConfig> {
+    fn find_parent_route_rule(
+        &self,
+        route: &str,
+        method: &Option<HttpMethod>,
+    ) -> Option<&RuleConfig> {
         // Find the longest parent route (prefix match)
         // Only matches routes that are configured with is_prefix=true and match the method
         // e.g. for "/api/contact/123" find "/api/contact/" if it has is_prefix=true

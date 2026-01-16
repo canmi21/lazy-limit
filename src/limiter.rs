@@ -2,8 +2,7 @@
 
 use crate::config::LimiterConfig;
 use crate::gc::GarbageCollector;
-use crate::types::{RequestRecord, RuleConfig};
-use http::Method;
+use crate::types::{HttpMethod, RequestRecord, RuleConfig};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -30,7 +29,7 @@ impl RateLimiter {
         &mut self,
         who: &str,
         route: &str,
-        method: Option<Method>,
+        method: Option<HttpMethod>,
         override_mode: bool,
     ) -> bool {
         let (global_rule, route_rule_opt) = if override_mode {
@@ -108,7 +107,12 @@ impl RateLimiter {
     }
 
     /// Generate a unique record key based on route and method (if method-specific rule)
-    fn get_record_key(&self, route: &str, method: &Option<Method>, rule: &RuleConfig) -> String {
+    fn get_record_key(
+        &self,
+        route: &str,
+        method: &Option<HttpMethod>,
+        rule: &RuleConfig,
+    ) -> String {
         if rule.methods.is_some() && method.is_some() {
             // For method-specific rules, include the method in the key
             format!("{}::{}", route, method.as_ref().unwrap().as_str())
@@ -174,6 +178,7 @@ impl RateLimiter {
 mod tests {
     use super::*;
     use crate::types::{Duration, RuleConfig};
+    use axum::http::Method as AxumMethod;
     use std::time::Duration as StdDuration;
 
     #[tokio::test]
@@ -310,11 +315,11 @@ mod tests {
         let config = LimiterConfig::new(RuleConfig::new(Duration::seconds(1), 1))
             .add_route_rule(
                 "/api/data",
-                RuleConfig::new(Duration::seconds(1), 5).for_methods(vec![Method::GET]),
+                RuleConfig::new(Duration::seconds(1), 5).for_methods(vec![HttpMethod::GET]),
             )
             .add_route_rule(
                 "/api/create",
-                RuleConfig::new(Duration::seconds(1), 2).for_methods(vec![Method::POST]),
+                RuleConfig::new(Duration::seconds(1), 2).for_methods(vec![HttpMethod::POST]),
             );
 
         let mut limiter = RateLimiter::new(config).await;
@@ -324,7 +329,7 @@ mod tests {
         for i in 1..=5 {
             assert!(
                 limiter
-                    .check_limit(who, "/api/data", Some(Method::GET), false)
+                    .check_limit(who, "/api/data", Some(HttpMethod::GET), false)
                     .await,
                 "GET request {} to /api/data should pass",
                 i
@@ -332,7 +337,7 @@ mod tests {
         }
         assert!(
             !limiter
-                .check_limit(who, "/api/data", Some(Method::GET), false)
+                .check_limit(who, "/api/data", Some(HttpMethod::GET), false)
                 .await,
             "GET request 6 to /api/data should fail"
         );
@@ -340,13 +345,13 @@ mod tests {
         // Test POST on /api/data should use default rule (limit 1)
         assert!(
             limiter
-                .check_limit(who, "/api/data", Some(Method::POST), false)
+                .check_limit(who, "/api/data", Some(HttpMethod::POST), false)
                 .await,
             "POST request 1 to /api/data should pass with default rule"
         );
         assert!(
             !limiter
-                .check_limit(who, "/api/data", Some(Method::POST), false)
+                .check_limit(who, "/api/data", Some(HttpMethod::POST), false)
                 .await,
             "POST request 2 to /api/data should fail (default limit 1)"
         );
@@ -355,19 +360,19 @@ mod tests {
         let who2 = "test_user_methods2";
         assert!(
             limiter
-                .check_limit(who2, "/api/create", Some(Method::POST), false)
+                .check_limit(who2, "/api/create", Some(HttpMethod::POST), false)
                 .await,
             "POST request 1 to /api/create should pass"
         );
         assert!(
             limiter
-                .check_limit(who2, "/api/create", Some(Method::POST), false)
+                .check_limit(who2, "/api/create", Some(HttpMethod::POST), false)
                 .await,
             "POST request 2 to /api/create should pass"
         );
         assert!(
             !limiter
-                .check_limit(who2, "/api/create", Some(Method::POST), false)
+                .check_limit(who2, "/api/create", Some(HttpMethod::POST), false)
                 .await,
             "POST request 3 to /api/create should fail"
         );
@@ -376,13 +381,13 @@ mod tests {
         let who3 = "test_user_methods3";
         assert!(
             limiter
-                .check_limit(who3, "/api/create", Some(Method::GET), false)
+                .check_limit(who3, "/api/create", Some(HttpMethod::GET), false)
                 .await,
             "GET request 1 to /api/create should pass with default rule"
         );
         assert!(
             !limiter
-                .check_limit(who3, "/api/create", Some(Method::GET), false)
+                .check_limit(who3, "/api/create", Some(HttpMethod::GET), false)
                 .await,
             "GET request 2 to /api/create should fail (default limit 1)"
         );
@@ -394,11 +399,11 @@ mod tests {
         let config = LimiterConfig::new(RuleConfig::new(Duration::seconds(1), 10))
             .add_route_rule(
                 "/api/post-only",
-                RuleConfig::new(Duration::seconds(1), 3).for_methods(vec![Method::POST]),
+                RuleConfig::new(Duration::seconds(1), 3).for_methods(vec![HttpMethod::POST]),
             )
             .add_route_rule(
                 "/api/get-only",
-                RuleConfig::new(Duration::seconds(1), 5).for_methods(vec![Method::GET]),
+                RuleConfig::new(Duration::seconds(1), 5).for_methods(vec![HttpMethod::GET]),
             );
 
         let mut limiter = RateLimiter::new(config).await;
@@ -408,7 +413,7 @@ mod tests {
         for i in 1..=3 {
             assert!(
                 limiter
-                    .check_limit(who, "/api/post-only", Some(Method::POST), false)
+                    .check_limit(who, "/api/post-only", Some(HttpMethod::POST), false)
                     .await,
                 "POST request {} should pass",
                 i
@@ -416,7 +421,7 @@ mod tests {
         }
         assert!(
             !limiter
-                .check_limit(who, "/api/post-only", Some(Method::POST), false)
+                .check_limit(who, "/api/post-only", Some(HttpMethod::POST), false)
                 .await,
             "POST request 4 should fail"
         );
@@ -425,7 +430,7 @@ mod tests {
         for i in 1..=5 {
             assert!(
                 limiter
-                    .check_limit(who, "/api/get-only", Some(Method::GET), false)
+                    .check_limit(who, "/api/get-only", Some(HttpMethod::GET), false)
                     .await,
                 "GET request {} should pass (separate counter)",
                 i
@@ -433,7 +438,7 @@ mod tests {
         }
         assert!(
             !limiter
-                .check_limit(who, "/api/get-only", Some(Method::GET), false)
+                .check_limit(who, "/api/get-only", Some(HttpMethod::GET), false)
                 .await,
             "GET request 6 should fail"
         );
@@ -442,7 +447,7 @@ mod tests {
         for i in 1..=10 {
             assert!(
                 limiter
-                    .check_limit(who, "/api/post-only", Some(Method::GET), false)
+                    .check_limit(who, "/api/post-only", Some(HttpMethod::GET), false)
                     .await,
                 "GET request {} to POST-only route should pass with default",
                 i
@@ -450,7 +455,7 @@ mod tests {
         }
         assert!(
             !limiter
-                .check_limit(who, "/api/post-only", Some(Method::GET), false)
+                .check_limit(who, "/api/post-only", Some(HttpMethod::GET), false)
                 .await,
             "GET request 11 to POST-only route should fail"
         );
@@ -462,9 +467,9 @@ mod tests {
         let config = LimiterConfig::new(RuleConfig::new(Duration::seconds(1), 1)).add_route_rule(
             "/api/modify",
             RuleConfig::new(Duration::seconds(1), 3).for_methods(vec![
-                Method::POST,
-                Method::PUT,
-                Method::PATCH,
+                HttpMethod::POST,
+                HttpMethod::PUT,
+                HttpMethod::PATCH,
             ]),
         );
 
@@ -475,25 +480,25 @@ mod tests {
         // (because record_key includes the method)
         assert!(
             limiter
-                .check_limit(who, "/api/modify", Some(Method::POST), false)
+                .check_limit(who, "/api/modify", Some(HttpMethod::POST), false)
                 .await,
             "POST request 1 should pass"
         );
         assert!(
             limiter
-                .check_limit(who, "/api/modify", Some(Method::POST), false)
+                .check_limit(who, "/api/modify", Some(HttpMethod::POST), false)
                 .await,
             "POST request 2 should pass"
         );
         assert!(
             limiter
-                .check_limit(who, "/api/modify", Some(Method::POST), false)
+                .check_limit(who, "/api/modify", Some(HttpMethod::POST), false)
                 .await,
             "POST request 3 should pass"
         );
         assert!(
             !limiter
-                .check_limit(who, "/api/modify", Some(Method::POST), false)
+                .check_limit(who, "/api/modify", Some(HttpMethod::POST), false)
                 .await,
             "POST request 4 should fail"
         );
@@ -501,13 +506,13 @@ mod tests {
         // PUT should have its own counter
         assert!(
             limiter
-                .check_limit(who, "/api/modify", Some(Method::PUT), false)
+                .check_limit(who, "/api/modify", Some(HttpMethod::PUT), false)
                 .await,
             "PUT request 1 should pass"
         );
         assert!(
             limiter
-                .check_limit(who, "/api/modify", Some(Method::PUT), false)
+                .check_limit(who, "/api/modify", Some(HttpMethod::PUT), false)
                 .await,
             "PUT request 2 should pass"
         );
@@ -516,15 +521,74 @@ mod tests {
         let who2 = "test_user_multi_methods2";
         assert!(
             limiter
-                .check_limit(who2, "/api/modify", Some(Method::GET), false)
+                .check_limit(who2, "/api/modify", Some(HttpMethod::GET), false)
                 .await,
             "GET request should pass with default rule"
         );
         assert!(
             !limiter
-                .check_limit(who2, "/api/modify", Some(Method::GET), false)
+                .check_limit(who2, "/api/modify", Some(HttpMethod::GET), false)
                 .await,
             "2nd GET request should fail (default limit 1)"
+        );
+    }
+
+    fn map_method(m: AxumMethod) -> HttpMethod {
+        match m {
+            AxumMethod::GET => HttpMethod::GET,
+            AxumMethod::POST => HttpMethod::POST,
+            AxumMethod::PUT => HttpMethod::PUT,
+            AxumMethod::DELETE => HttpMethod::DELETE,
+            AxumMethod::PATCH => HttpMethod::PATCH,
+            AxumMethod::HEAD => HttpMethod::HEAD,
+            AxumMethod::OPTIONS => HttpMethod::OPTIONS,
+            AxumMethod::CONNECT => HttpMethod::CONNECT,
+            AxumMethod::TRACE => HttpMethod::TRACE,
+            _ => HttpMethod::OTHER,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_axum_http_method_conversion() {
+        // Ensure compatibility with axum::http::Method by converting via as_str()
+        let config = LimiterConfig::new(RuleConfig::new(Duration::seconds(1), 1)).add_route_rule(
+            "/axum/data",
+            RuleConfig::new(Duration::seconds(1), 2).for_methods(vec![HttpMethod::POST]),
+        );
+
+        let mut limiter = RateLimiter::new(config).await;
+        let who = "test_user_axum";
+
+        assert!(
+            limiter
+                .check_limit(who, "/axum/data", Some(map_method(AxumMethod::POST)), false)
+                .await,
+            "Axum POST request 1 should pass"
+        );
+        assert!(
+            limiter
+                .check_limit(who, "/axum/data", Some(map_method(AxumMethod::POST)), false)
+                .await,
+            "Axum POST request 2 should pass"
+        );
+        assert!(
+            !limiter
+                .check_limit(who, "/axum/data", Some(map_method(AxumMethod::POST)), false)
+                .await,
+            "Axum POST request 3 should fail"
+        );
+
+        assert!(
+            limiter
+                .check_limit(who, "/axum/data", Some(map_method(AxumMethod::GET)), false)
+                .await,
+            "Axum GET request 1 should pass (default rule)"
+        );
+        assert!(
+            !limiter
+                .check_limit(who, "/axum/data", Some(map_method(AxumMethod::GET)), false)
+                .await,
+            "Axum GET request 2 should fail (default limit 1)"
         );
     }
 }

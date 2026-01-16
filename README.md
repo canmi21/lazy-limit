@@ -72,6 +72,38 @@ if allowed {
 }
 ```
 
+If you only want to limit certain methods, you can also specify them:
+
+```rust
+let allowed = limit!("1.1.1.1", "/api/public", Some(HttpMethod::POST)).await;
+if allowed {
+    println!("Post request allowed!");
+} else {
+    println!("Post request denied: rate limit exceeded.");
+}
+```
+
+You can also map you own Methods with a helper function:
+
+```rust
+fn map_method(m: http::Method) -> HttpMethod {
+    match m {
+        http::Method::GET => HttpMethod::GET,
+        http::Method::POST => HttpMethod::POST,
+        http::Method::PUT => HttpMethod::PUT,
+        http::Method::DELETE => HttpMethod::DELETE,
+        http::Method::PATCH => HttpMethod::PATCH,
+        http::Method::HEAD => HttpMethod::HEAD,
+        http::Method::OPTIONS => HttpMethod::OPTIONS,
+        http::Method::CONNECT => HttpMethod::CONNECT,
+        http::Method::TRACE => HttpMethod::TRACE,
+        _ => HttpMethod::OTHER,
+    }
+}
+
+let allowed = limit!("1.1.1.1", "/api/public", Some(map_method(http::Method::POST))).await;
+```
+
 ### Override Mode
 
 Use the `limit_override!` macro to apply only route-specific rules, ignoring the global limit.
